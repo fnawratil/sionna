@@ -408,8 +408,16 @@ class InteractiveDisplay:
             size=2*radius, sizeAttenuation=True, vertexColors='VertexColors',
             map=tex, alphaTest=0.5, transparent=True,
         )
+
+        for point in points:
+            sphereGeom = p3s.SphereGeometry(radius=1)
+            mat = p3s.MeshLambertMaterial(color='red')
+            sphere = p3s.Mesh(sphereGeom, mat)
+            sphere.position = tuple(point)
+            self._add_child(sphere, pmin, pmax, persist=persist)
+
         mesh = p3s.Points(geo, mat)
-        self._add_child(mesh, pmin, pmax, persist=persist)
+        #self._add_child(mesh, pmin, pmax, persist=persist)
 
     def _add_child(self, obj, pmin, pmax, persist):
         """

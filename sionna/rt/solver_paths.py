@@ -1077,6 +1077,28 @@ class SolverPaths(SolverBase):
 
         return all_candidates, los_candidates
 
+    def defined_lattice(self, srcs, num_samples):
+        p1 = tf.constant([-50, -50, 0], self._rdtype)
+        p2 = tf.constant([50, 50, 0], self._rdtype)
+
+        xdiff = p2[0] - p1[0]
+        ydiff = p2[1] - p1[1]
+        cy = tf.floor(tf.sqrt(num_samples * (ydiff / xdiff))).numpy()
+        cx = tf.floor(num_samples / cy).numpy()
+
+        x = tf.linspace(tf.cast(p1[0], self._rdtype), p2[0], cx)
+        y = tf.linspace(tf.cast(p1[1], self._rdtype), p2[1], cy)
+        xx, yy = tf.meshgrid(x, y)
+        zz = tf.zeros_like(xx)
+        points = tf.stack([tf.reshape(xx, [-1]), tf.reshape(yy, [-1]), tf.reshape(zz, [-1])], axis=-1)
+
+        src_expanded = tf.expand_dims(srcs, 1)
+        points_expanded = tf.expand_dims(points, 0)
+        diffs = points_expanded - src_expanded
+        diffs = tf.reshape(diffs, (-1, 3))
+        normalized, _ =  tf.linalg.normalize(diffs, axis=1)
+        return normalized
+
     def _list_candidates_fibonacci(self, max_depth, sources, num_samples,
                                    los, reflection, scattering):
         r"""
@@ -1156,18 +1178,35 @@ class SolverPaths(SolverBase):
         # Only shoot if the scene is not empty
         if not is_empty:
 
-            # Keep track of which paths are still active
-            active = dr.full(mask_t, True, num_samples)
+
 
             # Initial ray: Arranged in a Fibonacci lattice on the unit
             # sphere.
             # [samples_per_source, 3]
-            lattice = fibonacci_lattice(samples_per_source, self._rdtype)
+            print("Source")
+            print(sources[0])
+            print("============================")
+            lattice = self.defined_lattice(sources, samples_per_source)
+            print("Defined lattice")
+            print(lattice)
+            print("============================")
+            #lattice = fibonacci_lattice(samples_per_source, self._rdtype)
+            #print("Fibonacci lattice")
+            #print(lattice)
+            #print("============================")
+
+            # Make sure that number of samples can be distributed on the rect
+            num_samples = lattice.shape[0]
+
+            # Keep track of which paths are still active
+            active = dr.full(mask_t, True, num_samples)
+
             source_i = dr.linspace(self._mi_scalar_t, 0, num_sources,
                                    num=num_samples, endpoint=False)
             sampled_d = self._mi_vec_t(tf.tile(lattice, [num_sources, 1]))
             source_i = mi.Int32(source_i)
             sources_dr = self._mi_tensor_t(sources)
+            print(sources_dr.array)
             ray = mi.Ray3f(
                 o=dr.gather(self._mi_vec_t, sources_dr.array, source_i),
                 d=sampled_d,
