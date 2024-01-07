@@ -350,6 +350,8 @@ class SolverPaths(SolverBase):
         The computed paths.
     """
 
+    def set_lattice_callable(self, callable):
+        self.lattice_callable = callable
 
     def trace_paths(self, max_depth, method, num_samples, los, reflection,
                  diffraction, scattering, scat_keep_prob, edge_diffraction):
@@ -516,9 +518,41 @@ class SolverPaths(SolverBase):
             #       Sequence of primitives hit at `hit_points`.
             # hit_points : [max_depth, num_sources, num_paths_per_source, 3]
             #     Coordinates of the intersection points.
-            output = self._list_candidates_fibonacci(max_depth,
-                                        sources, num_samples, los, reflection,
-                                        scattering)
+
+            def gen_fib_lattice(srcs, samp_per_src, dtype):
+                lattice = fibonacci_lattice(samp_per_src, dtype)
+                sampled_d = tf.tile(lattice, [srcs.shape[0], 1])
+                return sampled_d
+
+
+            output = self._list_candidates_lattice(max_depth,
+                                                   sources, num_samples, los, reflection,
+                                                   scattering, gen_fib_lattice)
+            candidates = output[0]
+            los_prim = output[1]
+            candidates_scat = output[2]
+            hit_points = output[3]
+
+        elif method == 'lattice':
+            # Sample sequences of primitives using shoot-and-bounce
+            # with length up to ``max_depth`` and by arranging the initial
+            # rays direction based on the lattice specified by the user.
+            # candidates: [max_depth, num paths], int
+            #     All unique candidate paths found, with depth up to
+            #       ``max_depth``.
+            # los_candidates: [num_samples], int
+            #     Candidate primitives found in LoS.
+            # candidates_scat : [max_depth, num_sources, num_paths_per_source]
+            #       Sequence of primitives hit at `hit_points`.
+            # hit_points : [max_depth, num_sources, num_paths_per_source, 3]
+            #     Coordinates of the intersection points.
+
+            if self.lattice_callable == None:
+                raise ValueError("Lattice method requires a callable lattice")
+
+            output = self._list_candidates_lattice(max_depth,
+                                                   sources, num_samples, los, reflection,
+                                                   scattering, self.lattice_callable)
             candidates = output[0]
             los_prim = output[1]
             candidates_scat = output[2]
@@ -1077,40 +1111,15 @@ class SolverPaths(SolverBase):
 
         return all_candidates, los_candidates
 
-    def defined_lattice(self, srcs, num_samples):
-        p1 = tf.constant([-50, -50, 0], self._rdtype)
-        p2 = tf.constant([50, 50, 0], self._rdtype)
-
-        xdiff = p2[0] - p1[0]
-        ydiff = p2[1] - p1[1]
-        cy = tf.floor(tf.sqrt(num_samples * (ydiff / xdiff))).numpy()
-        cx = tf.floor(num_samples / cy).numpy()
-
-        x = tf.linspace(tf.cast(p1[0], self._rdtype), p2[0], cx)
-        y = tf.linspace(tf.cast(p1[1], self._rdtype), p2[1], cy)
-        xx, yy = tf.meshgrid(x, y)
-        zz = tf.zeros_like(xx)
-        points = tf.stack([tf.reshape(xx, [-1]), tf.reshape(yy, [-1]), tf.reshape(zz, [-1])], axis=-1)
-
-        src_expanded = tf.expand_dims(srcs, 1)
-        points_expanded = tf.expand_dims(points, 0)
-        diffs = points_expanded - src_expanded
-        diffs = tf.reshape(diffs, (-1, 3))
-        normalized, _ =  tf.linalg.normalize(diffs, axis=1)
-        return normalized
-
-    def _list_candidates_fibonacci(self, max_depth, sources, num_samples,
-                                   los, reflection, scattering):
+    def _list_candidates_lattice(self, max_depth, sources, num_samples,
+                                 los, reflection, scattering, lattice_callable):
         r"""
         Generate potential candidate paths made of reflections only and the
-        LoS. Rays direction are arranged in a Fibonacci lattice on the unit
-        sphere.
+        LoS. Rays direction are arranged in lattice.
 
         This can be used when the triangle count or maximum depth make the
         exhaustive method impractical.
 
-        A budget of ``num_samples`` rays is split equally over the given
-        sources. Starting directions are sampled uniformly at random.
         Paths are simulated until the maximum depth is reached.
         We record all sequences of primitives hit and the prefixes of these
         sequences, and return unique sequences.
@@ -1136,6 +1145,9 @@ class SolverPaths(SolverBase):
 
         scattering : bool
             if set to `True`, then the scattered paths are computed
+
+        lattice_function : callable[srcs, samples_per_source, dtype] -> (num_samples, 3)
+            Function that generates the normalized initial ray directions.
 
         Output
         -------
@@ -1178,38 +1190,27 @@ class SolverPaths(SolverBase):
         # Only shoot if the scene is not empty
         if not is_empty:
 
-
-
-            # Initial ray: Arranged in a Fibonacci lattice on the unit
-            # sphere.
-            # [samples_per_source, 3]
-            print("Source")
-            print(sources[0])
-            print("============================")
-            lattice = self.defined_lattice(sources, samples_per_source)
-            print("Defined lattice")
-            print(lattice)
-            print("============================")
-            #lattice = fibonacci_lattice(samples_per_source, self._rdtype)
-            #print("Fibonacci lattice")
-            #print(lattice)
-            #print("============================")
+            # Initial rays: Arranged in a lattice
+            # [num_srcs * samples_per_source, 3]
+            lattice = lattice_callable(sources, samples_per_source, self._rdtype)
 
             # Make sure that number of samples can be distributed on the rect
             num_samples = lattice.shape[0]
+
+            # Convert lattice to proper type
+            lattice = self._mi_vec_t(lattice)
 
             # Keep track of which paths are still active
             active = dr.full(mask_t, True, num_samples)
 
             source_i = dr.linspace(self._mi_scalar_t, 0, num_sources,
                                    num=num_samples, endpoint=False)
-            sampled_d = self._mi_vec_t(tf.tile(lattice, [num_sources, 1]))
             source_i = mi.Int32(source_i)
             sources_dr = self._mi_tensor_t(sources)
-            print(sources_dr.array)
+
             ray = mi.Ray3f(
                 o=dr.gather(self._mi_vec_t, sources_dr.array, source_i),
-                d=sampled_d,
+                d=lattice,
             )
 
             for depth in range(max_depth):
