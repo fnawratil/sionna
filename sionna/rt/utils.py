@@ -584,6 +584,9 @@ def fibonacci_lattice(num_points, dtype=tf.float32):
     -------
     points : [num_points, 3]
         Generated rectangular coordinates of the lattice points
+
+    angle : float
+        Solid angle of the lattice extent
     """
 
     golden_ratio = tf.cast((1.+tf.sqrt(5.))/2., dtype)
@@ -607,7 +610,7 @@ def fibonacci_lattice(num_points, dtype=tf.float32):
     z = tf.cos(thetas)
     points = tf.stack([x,y,z], axis=1)
 
-    return points
+    return points, 4 * tf.PI
 
 def cot(x):
     """

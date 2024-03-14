@@ -28,7 +28,7 @@ class PathsTmpData:
     Class used to temporarily store values for paths calculation.
     """
 
-    def __init__(self, sources, targets, dtype):
+    def __init__(self, sources, targets, dtype, raySurfaceAngle=None):
 
         self.sources = sources
         self.targets = targets
@@ -159,6 +159,12 @@ class PathsTmpData:
         # Probability with which scattered paths are kept
         # (), tf.float
         self.scat_keep_prob = 0.0
+
+        # Ray surface angle
+        if raySurfaceAngle is not None:
+            self.raySurfaceAngle = raySurfaceAngle
+        else:
+            self.raySurfaceAngle = 4 * PI
 
     def to_dict(self):
         # pylint: disable=line-too-long
@@ -486,6 +492,8 @@ class SolverPaths(SolverBase):
             # [num_targets = num_rx*rx_array_size, 3]
             targets = tf.reshape(targets, [-1, 3])
 
+        sources = tf.cast(sources, self._rdtype)
+        targets = tf.cast(targets, self._rdtype)
 
         ##############################################
         # Generate candidate paths
@@ -520,9 +528,9 @@ class SolverPaths(SolverBase):
             #     Coordinates of the intersection points.
 
             def gen_fib_lattice(srcs, samp_per_src, dtype):
-                lattice = fibonacci_lattice(samp_per_src, dtype)
+                lattice, angle = fibonacci_lattice(samp_per_src, dtype)
                 sampled_d = tf.tile(lattice, [srcs.shape[0], 1])
-                return sampled_d
+                return sampled_d, angle
 
 
             output = self._list_candidates_lattice(max_depth,
@@ -557,6 +565,7 @@ class SolverPaths(SolverBase):
             los_prim = output[1]
             candidates_scat = output[2]
             hit_points = output[3]
+            raySurfaceAngle = output[4]
 
         else:
             raise ValueError(f"Unknown method '{method}'")
@@ -566,7 +575,7 @@ class SolverPaths(SolverBase):
         ##############################################
         spec_paths = Paths(sources=sources, targets=targets, scene=self._scene,
                            types=Paths.SPECULAR)
-        spec_paths_tmp = PathsTmpData(sources, targets, self._dtype)
+        spec_paths_tmp = PathsTmpData(sources, targets, self._dtype, raySurfaceAngle)
         if los or reflection:
 
             # Using the image method, computes the non-obstructed specular paths
@@ -584,7 +593,7 @@ class SolverPaths(SolverBase):
         ############################################
         diff_paths = Paths(sources=sources, targets=targets, scene=self._scene,
                            types=Paths.DIFFRACTED)
-        diff_paths_tmp = PathsTmpData(sources, targets, self._dtype)
+        diff_paths_tmp = PathsTmpData(sources, targets, self._dtype, raySurfaceAngle)
         if (los_prim is not None) and diffraction:
 
             # Get the candidate wedges for diffraction
@@ -644,7 +653,7 @@ class SolverPaths(SolverBase):
         ############################################
         scat_paths = Paths(sources=sources, targets=targets, scene=self._scene,
                            types=Paths.SCATTERED)
-        scat_paths_tmp = PathsTmpData(sources, targets, self._dtype)
+        scat_paths_tmp = PathsTmpData(sources, targets, self._dtype, raySurfaceAngle)
         if scattering and tf.shape(candidates_scat)[0] > 0:
 
             scat_paths, scat_paths_tmp = self._scat_test_rx_blockage(targets,sources,
@@ -747,7 +756,7 @@ class SolverPaths(SolverBase):
                           scene=self._scene)
         # Create empty objects for storing tensors that are required to compute
         # paths, but that will not be returned to the user
-        all_paths_tmp = PathsTmpData(sources, targets, self._dtype)
+        all_paths_tmp = PathsTmpData(sources, targets, self._dtype, spec_paths_tmp.raySurfaceAngle)
 
         # Rotation matrices corresponding to the orientations of the radio
         # devices
@@ -1192,7 +1201,7 @@ class SolverPaths(SolverBase):
 
             # Initial rays: Arranged in a lattice
             # [num_srcs * samples_per_source, 3]
-            lattice = lattice_callable(sources, samples_per_source, self._rdtype)
+            lattice, angle = lattice_callable(sources, samples_per_source, self._rdtype)
 
             # Make sure that number of samples can be distributed on the rect
             num_samples = lattice.shape[0]
@@ -1381,7 +1390,7 @@ class SolverPaths(SolverBase):
                 axis=[1]
             )
 
-        return candidates_ref, los_primitives, candidates_scat, hit_points
+        return candidates_ref, los_primitives, candidates_scat, hit_points, angle
 
     ##################################################################
     # Methods used for computing the specular paths
@@ -4567,10 +4576,12 @@ class SolverPaths(SolverBase):
             # [num_targets, num_sources, max_num_paths]
             scaling = tf.sqrt(f_s)*s
 
-            # The term cos(theta_i)*dA is equal to 4*PI/N*r^2
+            # The term cos(theta_i)*dA is equal to 4*PI/N*r^2 --> No, raySurfaceAngle/N*r^2 for generic lattice
             # [num_targets, num_sources, max_num_paths]
             num_samples = tf.cast(num_samples, self._rdtype)
-            scaling *= tf.sqrt(4*tf.cast(PI, self._rdtype)\
+            #scaling *= tf.sqrt(4*tf.cast(PI, self._rdtype)\
+            #    /(scat_keep_prob*num_samples))
+            scaling *= tf.sqrt(tf.cast(paths_tmp.raySurfaceAngle, self._rdtype)\
                 /(scat_keep_prob*num_samples))
             scaling *= paths_tmp.scat_src_2_last_int_dist
 
