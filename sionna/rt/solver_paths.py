@@ -540,6 +540,7 @@ class SolverPaths(SolverBase):
             los_prim = output[1]
             candidates_scat = output[2]
             hit_points = output[3]
+            raySurfaceAngle = output[4]
 
         elif method == 'lattice':
             # Sample sequences of primitives using shoot-and-bounce
@@ -1234,6 +1235,7 @@ class SolverPaths(SolverBase):
                 shape_i = dr.gather(mi.Int32, self._shape_indices,
                                     dr.reinterpret_array_v(mi.UInt32, si.shape),
                                     active)
+
                 offsets = dr.gather(mi.Int32, self._prim_offsets, shape_i,
                                     active)
                 prims_i = dr.select(active, offsets + si.prim_index, -1)
@@ -4134,6 +4136,9 @@ class SolverPaths(SolverBase):
         # [num_rx, 3, 3]
         rx_rot_mat = rotation_matrix(rx_orientations)
 
+        tx_rot_mat = tf.cast(tx_rot_mat, self._rdtype)
+        rx_rot_mat = tf.cast(rx_rot_mat, self._rdtype)
+
         return rx_rot_mat, tx_rot_mat
 
     def _get_antennas_relative_positions(self, rx_rot_mat, tx_rot_mat):
@@ -4159,16 +4164,18 @@ class SolverPaths(SolverBase):
             Relative positions of the transmitters antennas
         """
 
+
         # Rotated position of the TX and RX antenna elements
         # [1, tx_array_size, 3]
-        tx_rel_ant_pos = tf.expand_dims(self._scene.tx_array.positions, axis=0)
+        tx_rel_ant_pos = tf.cast(tf.expand_dims(self._scene.tx_array.positions, axis=0), self._rdtype)
+
         # [num_tx, 1, 3, 3]
         tx_rot_mat = tf.expand_dims(tx_rot_mat, axis=1)
         # [num_tx, tx_array_size, 3]
         tx_rel_ant_pos = tf.linalg.matvec(tx_rot_mat, tx_rel_ant_pos)
 
         # [1, rx_array_size, 3]
-        rx_rel_ant_pos = tf.expand_dims(self._scene.rx_array.positions, axis=0)
+        rx_rel_ant_pos = tf.cast(tf.expand_dims(self._scene.rx_array.positions, axis=0), self._rdtype)
         # [num_rx, 1, 3, 3]
         rx_rot_mat = tf.expand_dims(rx_rot_mat, axis=1)
         # [num_tx, tx_array_size, 3]
@@ -4456,7 +4463,7 @@ class SolverPaths(SolverBase):
         # directions, as an additional dimension
         # [num_rx, num_rx_patterns, 1/rx_array_size, num_tx, 1/tx_array_size,
         #   max_num_paths, 2]
-        rx_ant_fields_hat = tf.stack(rx_ant_fields_hat, axis=1)
+        rx_ant_fields_hat = tf.cast(tf.stack(rx_ant_fields_hat, axis=1), dtype=self._dtype)
         # Expand for broadcasting with tx polarization
         # [num_rx, num_rx_patterns, 1/rx_array_size, num_tx, 1, 1,
         #   1/tx_array_size, max_num_paths, 2]
@@ -4465,7 +4472,7 @@ class SolverPaths(SolverBase):
         # Stacking the patterns, corresponding to different polarization
         # [num_rx, 1/rx_array_size, num_tx, num_tx_patterns, 1/tx_array_size,
         #   max_num_paths, 2]
-        tx_ant_fields_hat = tf.stack(tx_ant_fields_hat, axis=3)
+        tx_ant_fields_hat =  tf.cast(tf.stack(tx_ant_fields_hat, axis=3), dtype=self._dtype)
         # Expand for broadcasting with rx polarization
         # [num_rx, 1, 1/rx_array_size, num_tx, num_tx_patterns, 1/tx_array_size,
         #   max_num_paths, 2]
@@ -4478,6 +4485,7 @@ class SolverPaths(SolverBase):
         rx_lcs2gcs = tf.expand_dims(tf.expand_dims(rx_lcs2gcs, axis=1), axis=4)
         # [num_rx, num_rx_patterns, 1/rx_array_size, num_tx, 1, 1/tx_array_size,
         #   max_num_paths, 2]
+
         rx_ant_fields = tf.linalg.matvec(rx_lcs2gcs, rx_ant_fields_hat)
         # Expand to broadcast with antenna patterns
         # [num_rx, 1, 1/rx_array_size, num_tx, 1, 1/tx_array_size,

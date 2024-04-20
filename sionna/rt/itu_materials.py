@@ -41,7 +41,8 @@ def instantiate_itu_materials(dtype):
     # Materials parameters will be updated when the frequency is set
     rm = RadioMaterial("itu_concrete",
                       frequency_update_callback=concrete_properties,
-                      dtype=dtype)
+                      dtype=dtype,
+                       scattering_coefficient=0.34)
     scene.Scene().add(rm)
 
     ##########################################
@@ -202,7 +203,8 @@ def instantiate_itu_materials(dtype):
     # Materials parameters will be updated when the frequency is set
     rm = RadioMaterial("itu_marble",
                        frequency_update_callback=marble_properties,
-                       dtype=dtype)
+                       dtype=dtype,
+                       scattering_coefficient=0.05)
     scene.Scene().add(rm)
 
     #########################################

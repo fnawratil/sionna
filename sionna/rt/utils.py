@@ -610,7 +610,7 @@ def fibonacci_lattice(num_points, dtype=tf.float32):
     z = tf.cos(thetas)
     points = tf.stack([x,y,z], axis=1)
 
-    return points, 4 * tf.PI
+    return points, 4 * PI
 
 def cot(x):
     """
