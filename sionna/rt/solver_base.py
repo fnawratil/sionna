@@ -392,7 +392,7 @@ class SolverBase:
         """
         # Translate the origin a bit along the ray direction to avoid
         # consecutive intersection with the same primitive
-        o = o + SolverBase.EPSILON_OBSTRUCTION*d
+        o = o + SolverBase.EPSILON_OBSTRUCTION*d*100
         # [batch_size, 3]
         mi_o = self._mi_point_t(o)
         # Ray direction
@@ -402,7 +402,7 @@ class SolverBase:
         # Reduce the ray length by a small value to avoid false positive when
         # testing for LoS to a primitive due to hitting the primitive we are
         # testing visibility to.
-        maxt = maxt - 2.*SolverBase.EPSILON_OBSTRUCTION
+        maxt = maxt - 100.*SolverBase.EPSILON_OBSTRUCTION
         mi_maxt = self._mi_scalar_t(maxt)
         # Mitsuba ray
         mi_ray = mi.Ray3f(o=mi_o, d=mi_d, maxt=mi_maxt, time=0.,

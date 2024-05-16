@@ -9,7 +9,9 @@ These materials are from Table 3 of the Recommendation ITU-R P.2040-2.
 
 import numpy as np
 from .radio_material import RadioMaterial
+from .scattering_pattern import DirectivePattern
 from . import scene
+
 
 def instantiate_itu_materials(dtype):
     #########################################
@@ -42,7 +44,9 @@ def instantiate_itu_materials(dtype):
     rm = RadioMaterial("itu_concrete",
                       frequency_update_callback=concrete_properties,
                       dtype=dtype,
-                       scattering_coefficient=0.34)
+                      scattering_coefficient=0.2,
+                      scattering_pattern = DirectivePattern(alpha_r=4)
+    )
     scene.Scene().add(rm)
 
     ##########################################
@@ -61,7 +65,9 @@ def instantiate_itu_materials(dtype):
     # Materials parameters will be updated when the frequency is set
     rm = RadioMaterial("itu_brick",
                        frequency_update_callback=brick_properties,
-                       dtype=dtype)
+                       dtype=dtype,
+                       scattering_coefficient=0.2,
+                       scattering_pattern = DirectivePattern(alpha_r=4))
     scene.Scene().add(rm)
 
     #########################################
@@ -204,7 +210,8 @@ def instantiate_itu_materials(dtype):
     rm = RadioMaterial("itu_marble",
                        frequency_update_callback=marble_properties,
                        dtype=dtype,
-                       scattering_coefficient=0.05)
+                       scattering_coefficient=0.05,
+                       scattering_pattern=DirectivePattern(alpha_r=4))
     scene.Scene().add(rm)
 
     #########################################

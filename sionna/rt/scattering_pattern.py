@@ -440,7 +440,7 @@ class LambertianPattern(ScatteringPattern):
     .. figure:: ../figures/lambertian_pattern_cut.png
         :align: center
     """
-    def __init__(self, dtype=tf.complex64):
+    def __init__(self, dtype=tf.complex128):
         super().__init__(alpha_r=0, alpha_i=1, lambda_=1, dtype=dtype)
 
 class DirectivePattern(ScatteringPattern):
@@ -483,7 +483,7 @@ class DirectivePattern(ScatteringPattern):
     """
     def __init__(self,
                  alpha_r,
-                 dtype=tf.complex64):
+                 dtype=tf.complex128):
         super().__init__(alpha_r=alpha_r, alpha_i=1, lambda_=1, dtype=dtype)
 
 class BackscatteringPattern(ScatteringPattern):
@@ -547,6 +547,6 @@ class BackscatteringPattern(ScatteringPattern):
                  alpha_r,
                  alpha_i,
                  lambda_,
-                 dtype=tf.complex64):
+                 dtype=tf.complex128):
         super().__init__(alpha_r=alpha_r, alpha_i=alpha_i, lambda_=lambda_,
                          dtype=dtype)

@@ -513,6 +513,7 @@ class SolverPaths(SolverBase):
             #     list of all the primitives in the scene.
             candidates, los_prim = self._list_candidates_exhaustive(max_depth,
                                                                 los, reflection)
+            raySurfaceAngle = 4 * PI
         elif method == 'fibonacci':
             # Sample sequences of primitives using shoot-and-bounce
             # with length up to ``max_depth`` and by arranging the initial
@@ -624,6 +625,8 @@ class SolverPaths(SolverBase):
                 self._compute_diffraction_points(targets, sources,
                                                  diff_wedges_indices)
 
+            #print("IndicesOrg", diff_wedges_indices)
+
 
             # Discard obstructed diffracted paths
             # Only check for wedge visibility if there is at least one candidate
@@ -635,9 +638,12 @@ class SolverPaths(SolverBase):
                                                   diff_wedges_indices,
                                                   diff_vertices)
 
+                #print("IndexObs", diff_wedges_indices)
+
             diff_paths = Paths(sources=sources, targets=targets,
                                scene=self._scene, types=Paths.DIFFRACTED)
             diff_paths.objects = tf.expand_dims(diff_wedges_indices, axis=0)
+            #print("Objects", diff_paths.objects)
             diff_paths.vertices = tf.expand_dims(diff_vertices, axis=0)
 
             # Select only the valid paths
@@ -2855,17 +2861,20 @@ class SolverPaths(SolverBase):
         # Ray origin
         # d : [batch_size, 3]
         # maxt : [batch_size]
-        d,maxt = tf.linalg.normalize(wedges_points - sources, axis=1)
-        maxt = tf.squeeze(maxt, axis=1)
+        #d,maxt = tf.linalg.normalize(wedges_points - sources, axis=1)
+        #maxt = tf.squeeze(maxt, axis=1) - 2
         # [batch_size]
-        valid_t2w = tf.logical_not(self._test_obstruction(sources, d, maxt))
+        #valid_t2w = tf.logical_not(self._test_obstruction(sources, d, maxt))
+        d,maxt = tf.linalg.normalize(sources - wedges_points, axis=1)
+        maxt = 100
+        valid_t2w = tf.logical_not(self._test_obstruction(wedges_points, d, maxt))
 
         # Check visibility between wedge and receiver
         # Ray origin
         # d : [batch_size, 3]
         # maxt : [batch_size]
         d,maxt = tf.linalg.normalize(wedges_points - targets, axis=1)
-        maxt = tf.squeeze(maxt, axis=1)
+        maxt = tf.squeeze(maxt, axis=1) - 1
         # [batch_size]
         valid_w2r = tf.logical_not(self._test_obstruction(targets, d, maxt))
 
@@ -4036,9 +4045,11 @@ class SolverPaths(SolverBase):
             total_distance = tf.cumsum(distances[:max_depth], axis=0)
         else:
             # [num_targets, num_sources, max_num_paths]
-            total_distance = tf.reduce_sum(distances, axis=0)
+            total_distance = tf.reduce_sum(distances[:], axis=0)
             # [num_targets, num_sources, max_num_paths]
             tau = total_distance / SPEED_OF_LIGHT
+
+        #print(total_distance)
 
         # Compute angles of departures and arrival
         # theta_t, phi_t: [num_targets, num_sources, max_num_paths]
@@ -4589,8 +4600,10 @@ class SolverPaths(SolverBase):
             num_samples = tf.cast(num_samples, self._rdtype)
             #scaling *= tf.sqrt(4*tf.cast(PI, self._rdtype)\
             #    /(scat_keep_prob*num_samples))
-            scaling *= tf.sqrt(tf.cast(paths_tmp.raySurfaceAngle, self._rdtype)\
-                /(scat_keep_prob*num_samples))
+            #scalingFactor = \
+            #    /(scat_keep_prob*tf.cast(num_samples, self._rdtype)))
+            scaling *= tf.sqrt(tf.cast(paths_tmp.raySurfaceAngle, self._rdtype))
+            scaling /= tf.sqrt(scat_keep_prob * num_samples)
             scaling *= paths_tmp.scat_src_2_last_int_dist
 
             # Apply path loss due to propagation from scattering point
