@@ -44,7 +44,7 @@ def instantiate_itu_materials(dtype):
     rm = RadioMaterial("itu_concrete",
                       frequency_update_callback=concrete_properties,
                       dtype=dtype,
-                      scattering_coefficient=0.2,
+                      scattering_coefficient=0.15,
                       scattering_pattern = DirectivePattern(alpha_r=4)
     )
     scene.Scene().add(rm)
@@ -67,7 +67,7 @@ def instantiate_itu_materials(dtype):
                        frequency_update_callback=brick_properties,
                        dtype=dtype,
                        scattering_coefficient=0.2,
-                       scattering_pattern = DirectivePattern(alpha_r=4))
+                       scattering_pattern = DirectivePattern(alpha_r=3))
     scene.Scene().add(rm)
 
     #########################################

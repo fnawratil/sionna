@@ -1216,12 +1216,14 @@ class SolverPaths(SolverBase):
             # Convert lattice to proper type
             lattice = self._mi_vec_t(lattice)
 
+
             # Keep track of which paths are still active
             active = dr.full(mask_t, True, num_samples)
 
             source_i = dr.linspace(self._mi_scalar_t, 0, num_sources,
                                    num=num_samples, endpoint=False)
             source_i = mi.Int32(source_i)
+
             sources_dr = self._mi_tensor_t(sources)
 
             ray = mi.Ray3f(
@@ -2139,6 +2141,13 @@ class SolverPaths(SolverBase):
         num_sources = len(sources)
         num_targets = len(targets)
 
+        #print("Sources", sources)
+        #print("Targets", targets)
+
+        #if tf.norm(sources, axis=-1)[0] > 1e6:
+        #    sources /= 1e6
+        #    print("Updates sources", sources)
+
         # --- Phase 1
         # Starting from the sources, mirror each point against the
         # given candidate primitive. At this stage, we do not carry
@@ -2225,7 +2234,7 @@ class SolverPaths(SolverBase):
             # [num_targets*num_sources*num_samples]
             blk = self._test_obstruction(tf.reshape(current, [-1, 3]),
                                          tf.reshape(d, [-1, 3]),
-                                         tf.reshape(maxt, [-1]))
+                                         tf.reshape(maxt, [-1]) - 4)
 
             # The following call:
             # - Discards paths that are blocked
