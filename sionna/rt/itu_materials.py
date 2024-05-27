@@ -44,7 +44,7 @@ def instantiate_itu_materials(dtype):
     rm = RadioMaterial("itu_concrete",
                       frequency_update_callback=concrete_properties,
                       dtype=dtype,
-                      scattering_coefficient=0.15,
+                      scattering_coefficient=0.3,
                       scattering_pattern = DirectivePattern(alpha_r=4)
     )
     scene.Scene().add(rm)
@@ -190,6 +190,8 @@ def instantiate_itu_materials(dtype):
     # Materials parameters will be updated when the frequency is set
     rm = RadioMaterial("itu_plywood",
                        frequency_update_callback=plywood_properties,
+                       scattering_coefficient=0.2,
+                       scattering_pattern=DirectivePattern(alpha_r=4),
                        dtype=dtype)
     scene.Scene().add(rm)
 
@@ -230,6 +232,8 @@ def instantiate_itu_materials(dtype):
     # Materials parameters will be updated when the frequency is set
     rm = RadioMaterial("itu_floorboard",
                        frequency_update_callback=floorboard_properties,
+                       scattering_coefficient=0.2,
+                       scattering_pattern=DirectivePattern(alpha_r=4),
                        dtype=dtype)
     scene.Scene().add(rm)
 
@@ -308,3 +312,27 @@ def instantiate_itu_materials(dtype):
                        frequency_update_callback=wet_ground_properties,
                        dtype=dtype)
     scene.Scene().add(rm)
+
+
+    #########################################
+    # TERRAIN
+    #########################################
+
+    def terrain_properties(f_hz):
+        f_ghz = f_hz / 1e9
+        if f_ghz < 1.0 or f_ghz > 100.:
+            return (-1.0, -1.0)
+
+        relative_permittivity = 5.24
+        conductivity = 0.0462 * np.power(f_ghz, 0.7822)
+        return (relative_permittivity, conductivity)
+
+    rm = RadioMaterial("terrain",
+                       frequency_update_callback=terrain_properties,
+                       dtype=dtype,
+                       scattering_coefficient=0.1,
+                       scattering_pattern=DirectivePattern(alpha_r=3)
+                       )
+
+    scene.Scene().add(rm)
+

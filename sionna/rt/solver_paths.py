@@ -2234,7 +2234,7 @@ class SolverPaths(SolverBase):
             # [num_targets*num_sources*num_samples]
             blk = self._test_obstruction(tf.reshape(current, [-1, 3]),
                                          tf.reshape(d, [-1, 3]),
-                                         tf.reshape(maxt, [-1]) - 4)
+                                         tf.reshape(maxt, [-1]) - 10)
 
             # The following call:
             # - Discards paths that are blocked
